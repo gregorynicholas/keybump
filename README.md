@@ -5,15 +5,26 @@ keybump
 * keybump makes following the [semantic versioning specification](http://semver.org/) a breeze.
 * keybump helps to automate the tedious task of summarizing changes from one version to the next by intelligently parsing the commit messages.
 
+
+links
+
+* [docs](http://gregorynicholas.github.io/keybump)
+* [source](http://gregorynicholas.github.com/keybump)
+* [package](http://packages.python.org/keybump)
+* [semantic versioning specification](http://semver.org)
+
 -----
 
 
-### introduction
-
 [![Build Status](https://secure.travis-ci.org/gregorynicholas/keybump.png?branch=develop)](https://travis-ci.org/gregorynicholas/keybump)
 
-if called with no options, keybump will print the script's current
-git tag version. it has been tested on the following configuration:
+
+-----
+
+
+### getting started
+
+it has been tested on the following configuration:
 
 * macosx *10.7.6*
 * python *2.7.4*
@@ -83,6 +94,10 @@ project's information:
 
 
 -----
+
+### git commit message parsing
+
+* see: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
 
 
 ### github-flavored-markdown notes

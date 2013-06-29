@@ -3,6 +3,7 @@
   keybump_tests
   ~~~~~~~~~~~~~
 
+
   :copyright: (c) 2013 by gregorynicholas.
   :license: MIT, see LICENSE for more details.
 """
@@ -11,27 +12,8 @@ import unittest
 import tempfile
 from mock import patch, MagicMock
 from StringIO import StringIO
-
-
-def monkey_keybump_module():
-  """
-  monkeypatch the script as a python module..
-  """
-  import shutil
-  unmonkey_keybump_module()
-  shutil.copy("keybump", "keybump.py")
-
-
-def unmonkey_keybump_module():
-  """
-  undo the keybump module monkeypatch..
-  """
-  if os.path.exists("keybump.py"):
-    os.remove("keybump.py")
-  if os.path.exists("keybump.pyc"):
-    os.remove("keybump.pyc")
-
-monkey_keybump_module()
+if os.path.exists("keybump.pyc"):
+  os.remove("keybump.pyc")
 import keybump
 
 
@@ -231,7 +213,7 @@ class ProjectClassTests(_TestCase):
         version_num="0.0.0",
         datestr=datestr,
         summaries=keybump.formatjoin(
-          keybump.DEFAULT_SUMMARY_ITEM_PREFIX, summs))
+          keybump.DEFAULT_CHANGELOG_ITEM_FMT, summs))
       f.write(contents)
     self.project.parse_releases()
     self.assertEquals(1, self.project.release_count)
@@ -257,4 +239,3 @@ class KeybumpTests(_TestCase):
 
 if __name__ == "__main__":
   unittest.main(exit=False)
-  unmonkey_keybump_module()

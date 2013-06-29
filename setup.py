@@ -3,22 +3,31 @@
   keybump
   ~~~~~~~
 
-  helper script to perform a project release, and follow the semantic
-  versioning specification.
+  an opinionated script for managing + automating version releases in a github
+  project. it makes following the semantic versioning specification a breeze.
 
   links
   -----
 
-* [github docs](http://gregorynicholas.github.com/keybump)
-* [docs](http://packages.python.org/keybump)
+* [docs](http://gregorynicholas.github.io/keybump)
+* [source](http://gregorynicholas.github.com/keybump)
+* [package](http://packages.python.org/keybump)
 * [semantic versioning specification](http://semver.org)
 
 """
 from setuptools import setup
 
-# grab requirments.
-with open("requirements.txt") as f:
+# setup the .keybump dir in the user home directory..
+from os import path, makedirs
+data_dir = path.expanduser("~/.keybump")
+makedirs(data_dir)
+
+with open("requirements.txt", "r") as f:
   required = f.readlines()
+
+with open("README.md", "r") as f:
+  long_description = f.read()
+
 
 setup(
   name="keybump",
@@ -26,18 +35,27 @@ setup(
   url="http://github.com/gregorynicholas/keybump",
   license="MIT",
   author="gregorynicholas",
-  description="helper script to perform a project release, and follow the "
-  "semantic versioning specification.",
-  long_description=__doc__,
-  scripts=["keybump"],
+  author_email="gn@gregorynicholas.com",
+  description=__doc__,
+  long_description=long_description,
+  py_modules=['keybump'],
+  entry_points={
+    "console_scripts": [
+      'keybump = keybump:main',
+    ]
+  },
   zip_safe=False,
   platforms="any",
   install_requires=required,
+  data_files=[
+    (data_dir, [
+      "data/.KEYBUMP_CHANGELOG_FMT",
+      "data/.KEYBUMP_TAG_MSG_FMT",
+    ])
+  ],
   tests_require=[
-    "nose==1.2.1",
     "mock==1.0.1",
   ],
-  dependency_links=[],
   test_suite="keybump_tests",
   classifiers=[
     'Environment :: Web Environment',

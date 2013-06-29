@@ -1,0 +1,26 @@
+
+release:
+  skip_interactive: false
+  skip_tag: false
+  skip_push: false
+  skip_commit: false
+  pypi_distribute: true
+
+
+defaults:
+  changelog_file: "CHANGES.md"
+  summary_separator_char: "-"
+
+
+formats:
+  git_tag_msg_fmt: ~/.keybump/GIT_TAG_MSG_FMT
+  git_commit_msg_fmt: ~/.keybump/GIT_COMMIT_MSG_FMT
+  changelog_fmt: ~/.keybump/CHANGELOG_FMT
+  changelog_item_fmt: ~/.keybump/CHANGELOG_ITEM_FMT
+  datestr_fmt: "%Y-%m-%d"
+
+
+initial_version:
+  version_num: "0.0.0"
+  changelog_item: "initial version setup"
+

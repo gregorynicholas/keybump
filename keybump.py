@@ -3,8 +3,13 @@
   keybump
   ~~~~~~~
 
-  an opinionated script for managing version releases in a github project
-  and following the semantic versioning specification.
+  manage your versioning like a boss.
+
+  * an opinionated script for managing version releases in a github project.
+  * makes following the semantic versioning specification a breeze.
+  * helps to automate the tedious task of summarizing changes from one version
+    to the next by intelligently parsing the commit messages.
+
 
   :copyright: (c) 2013 by gregorynicholas.
   :license: MIT, see LICENSE for more details.
@@ -18,6 +23,7 @@ from optparse import OptionParser
 from datetime import datetime
 from subprocess import Popen
 from subprocess import PIPE, STDOUT
+from termcolor import cprint
 
 __all__ = [
   "main", "ensure_clean_index",
@@ -36,19 +42,14 @@ github_issue_reference_keywords = [
   "resolved",
 ]
 
-DEFAULT_CONFIG_FILE = ".keybump"
-DEFAULT_SKIP_INTERACTIVE = False
-DEFAULT_SKIP_TAG = False
-DEFAULT_SKIP_PUSH = False
-DEFAULT_SKIP_COMMIT = False
-DEFAULT_PYPI_DISTRIBUTE = True
+DEFAULT_CONFIG_FILE = ".keybump.yaml"
 DEFAULT_CHANGELOG_FILE = "CHANGES.md"
 DEFAULT_TAG_MSG_FMT = "Version bumped to {version_num}"
 DEFAULT_COMMIT_MSG_FMT = "Version bumped to {version_num}"
-SUMMARY_SEPARATOR = "-"
+CHANGELOG_VERSION_SEPARATOR_CHAR = "-"
 INITIAL_VERSION_NUM = "0.0.0"
-INITIAL_VERSION_SUMMARY_ITEM = "initial version setup"
-DEFAULT_SUMMARY_ITEM_PREFIX = "    * "
+INITIAL_VERSION_CHANGELOG_ITEM = "initial version setup"
+DEFAULT_CHANGELOG_ITEM_FMT = "    * {summary}"
 DEFAULT_DATESTR_FMT = "%Y-%m-%d"
 DEFAULT_CHANGELOG_FMT = """
 Version {version_num}
@@ -103,34 +104,29 @@ class KeybumpConfig(dict):
 
   @classmethod
   def from_cli_options(cls, options):
-    rv = cls(
-      bump_type=options.bump_type,
-      skip_interactive=options.skip_interactive,
-      skip_tag=options.skip_tag,
-      skip_push=options.skip_push,
-      skip_commit=options.skip_commit,
-      pypi_distribute=options.pypi_distribute,
-      changelog_file=options.changelog_file,
-      changelog_fmt=options.changelog_fmt,
-      commit_msg_fmt=options.commit_msg_fmt,
-      summaryitem_fmt=options.summaryitem_fmt,
-      tag_msg_fmt=options.tag_msg_fmt)
     if options.config_file:
-      rv.load(options.config_file)
+      return cls.from_config(cls, options.config_file)
+    else:
+      return cls(
+        bump_type=options.bump_type,
+        skip_interactive=options.skip_interactive,
+        skip_tag=options.skip_tag,
+        skip_push=options.skip_push,
+        skip_commit=options.skip_commit,
+        pypi_distribute=options.pypi_distribute,
+        changelog_file=options.changelog_file,
+        changelog_fmt=options.changelog_fmt,
+        commit_msg_fmt=options.commit_msg_fmt,
+        changelog_item_fmt=options.changelog_item_fmt,
+        tag_msg_fmt=options.tag_msg_fmt)
+
+  @classmethod
+  def from_config(cls, config_file):
+    rv = cls()
+    rv.load(config_file)
     return rv
 
   def __init__(self, *args, **kw):
-    self.bump_type = None
-    self.skip_interactive = DEFAULT_SKIP_INTERACTIVE
-    self.skip_tag = DEFAULT_SKIP_TAG
-    self.skip_push = DEFAULT_SKIP_PUSH
-    self.skip_commit = DEFAULT_SKIP_COMMIT
-    self.pypi_distribute = DEFAULT_PYPI_DISTRIBUTE
-    self.changelog_file = DEFAULT_CHANGELOG_FILE
-    self.changelog_fmt = DEFAULT_CHANGELOG_FMT
-    self.summaryitem_fmt = DEFAULT_SUMMARY_ITEM_PREFIX
-    self.commit_msg_fmt = DEFAULT_COMMIT_MSG_FMT
-    self.tag_msg_fmt = DEFAULT_TAG_MSG_FMT
     dict.__init__(self, *args)
     self.update(*args, **kw)
 
@@ -176,17 +172,17 @@ class Project(object):
     self.config = config
     self.changelog = Changelog(config.changelog_file)
     self.skip_interactive = config.skip_interactive
-    self.changelog_fmt = config.changelog_fmt
     self.commit_msg_fmt = config.commit_msg_fmt
     self.tag_msg_fmt = config.tag_msg_fmt
-    self.summaryitem_fmt = config.summaryitem_fmt
+    self.changelog_fmt = config.changelog_fmt
+    self.changelog_item_fmt = config.changelog_item_fmt
     self.summaryformatter = None
 
     self.releases = []
     self.tags = []
     self.current_tag = None
     self.last_version_num = INITIAL_VERSION_NUM
-    self.initial_version_summary_item = INITIAL_VERSION_SUMMARY_ITEM
+    self.initial_version_changelog_item = INITIAL_VERSION_CHANGELOG_ITEM
 
   @property
   def codename(self):
@@ -265,7 +261,7 @@ class Project(object):
           continue
         version_num = ver_match.group(1).strip()
         value = lineiter.next()
-        if not value.count(SUMMARY_SEPARATOR):
+        if not value.count(CHANGELOG_VERSION_SEPARATOR_CHAR):
           continue
 
         # parse the release data and codename..
@@ -288,9 +284,9 @@ class Project(object):
             break
           if summary:
             if len(summary.strip()) > 0:
-              # strip summary_item_fmt front beginning of item..
-              l = len(self.summaryitem_fmt)
-              if summary[0:l] == self.summaryitem_fmt:
+              # strip changelog_item_fmt front beginning of item..
+              l = len(self.changelog_item_fmt)
+              if summary[0:l] == self.changelog_item_fmt:
                 summary = summary[l:]
               # remove newline char at end..
               summaries.append(summary[:-1])
@@ -330,7 +326,7 @@ class Project(object):
   def create_initial_release(self, version_num):
     rel = Release(
       self, version_num, datestr=today_str(),
-      summaries=[self.initial_version_summary_item])
+      summaries=[self.initial_version_changelog_item])
     return rel
 
   def new_release(self):
@@ -465,7 +461,8 @@ class Release(object):
     return self.project.changelog_fmt.format(
       version_num=self.version_num,
       datestr=self.datestr,
-      summaries=formatjoin(self.project.summaryitem_fmt, self.summaries))
+      summaries=formatjoin(
+        self.project.changelog_item_fmt, self.summaries))
 
   def _bump_num(self, version_num, bump_type=PATCH_BUMP):
     """
@@ -687,7 +684,7 @@ def sh(command, error=None, cwd=None, *args, **kw):
   if len(kw) > 0:
     command = command.format(**kw)
 
-  def runpipe():
+  def _runpipe():
     p = Popen(
       command,
       cwd=cwd,
@@ -702,7 +699,7 @@ def sh(command, error=None, cwd=None, *args, **kw):
         fail(p_stdout)
       fail("command error: `{}`. return code: {}", command, p.returncode)
     return p_stdout
-  return runpipe()
+  return _runpipe()
 
 
 def choice(msg):
@@ -736,7 +733,7 @@ def stdout():
 
 
 def fail(message, *args):
-  print >> stderr(), "error:", message.format(*args)
+  cprint(message.format(*args), "red", attrs=["bold"], file=stderr())
   exit(1)
 
 
@@ -750,6 +747,7 @@ def print_project_info(current_tag, last_tag, version_num):
   """
   info(INFO_FMT, last_tag, current_tag, version_num)
   exit(0)
+
 
 parser = OptionParser(
   description="description: keybump makes following the semantic versioning "
@@ -765,11 +763,6 @@ parser.add_option(
   help="path to a keybump configuration file.")
 
 parser.add_option(
-  "--skip-interactive", dest="skip_interactive", action="store_true",
-  default=DEFAULT_SKIP_INTERACTIVE,
-  help="skips interactive command line interface.")
-
-parser.add_option(
   "--bump", dest="bump_type", choices=BUMP_TYPES,
   help="""version bump type to increment. must be
   one of:
@@ -778,22 +771,27 @@ parser.add_option(
     patch x.x.[x]""")
 
 parser.add_option(
+  "--skip-interactive", dest="skip_interactive", action="store_true",
+  default=False,
+  help="skips interactive command line interface.")
+
+parser.add_option(
   "--skip-commit", dest="skip_commit", action="store_true",
-  default=DEFAULT_SKIP_COMMIT,
+  default=False,
   help="skips creating a git tag at the current HEAD")
 
 parser.add_option(
-  "--skip-tag", dest="skip_tag", action="store_true", default=DEFAULT_SKIP_TAG,
+  "--skip-tag", dest="skip_tag", action="store_true", default=False,
   help="skips creating a git tag at the current HEAD")
 
 parser.add_option(
   "--skip-push", dest="skip_push", action="store_true",
-  default=DEFAULT_SKIP_PUSH,
+  default=False,
   help="skips pushing to the remote origin")
 
 parser.add_option(
   "--pypi-dist", dest="pypi_distribute", action="store_true",
-  default=DEFAULT_PYPI_DISTRIBUTE,
+  default=True,
   help="build the release and upload to the python package index")
 
 # todo: implement message formats as cli options..
@@ -808,8 +806,8 @@ parser.add_option(
   help="string format of the changelog version summary")
 
 parser.add_option(
-  "--summaryitem-fmt", dest="summaryitem_fmt",
-  default=DEFAULT_SUMMARY_ITEM_PREFIX,
+  "--changelog-item-fmt", dest="changelog_item_fmt",
+  default=DEFAULT_CHANGELOG_ITEM_FMT,
   help="string format of a changelog item summary")
 
 parser.add_option(
@@ -821,7 +819,7 @@ parser.add_option(
   help="string format of the git tag")
 
 
-def main(options, args):
+def run(options, args):
   config = KeybumpConfig.from_cli_options(options)
   project = Project(config)
   project.parse_git_tags()
@@ -904,5 +902,9 @@ def main(options, args):
   exit(0)
 
 
+def main():
+  run(*parser.parse_args())
+
+
 if __name__ == "__main__":
-  main(*parser.parse_args())
+  main()
